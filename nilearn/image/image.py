@@ -676,7 +676,7 @@ def iter_img(imgs):
     return check_niimg_4d(imgs, return_iterator=True)
 
 
-def new_img_like(ref_niimg, data, affine=None, copy_header=False):
+def new_img_like(ref_niimg, data, affine=None, copy_header=True):
     """Create a new image of the same class as the reference image
 
     Parameters
@@ -692,7 +692,7 @@ def new_img_like(ref_niimg, data, affine=None, copy_header=False):
 
     copy_header : :obj:`bool`, optional
         Indicated if the header of the reference image should be used to
-        create the new image. Default=False.
+        create the new image. Default=True.
 
     Returns
     -------
