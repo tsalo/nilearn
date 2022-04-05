@@ -251,9 +251,19 @@ def _convolve_regressors(events, hrf_model, frame_times, fir_delays=[0],
 
 @fill_doc
 def make_first_level_design_matrix(
-        frame_times, events=None, hrf_model='glover',
-        drift_model='cosine', high_pass=.01, drift_order=1, fir_delays=[0],
-        add_regs=None, add_reg_names=None, min_onset=-24, oversampling=50):
+    frame_times,
+    events=None,
+    hrf_model='glover',
+    drift_model='cosine',
+    high_pass=.01,
+    drift_order=1,
+    fir_delays=[0],
+    add_regs=None,
+    add_reg_names=None,
+    min_onset=-24,
+    oversampling=50,
+    orthogonalize_modulated_conditions=False,
+):
     """Generate a design matrix from the input parameters
 
     Parameters
@@ -317,6 +327,18 @@ def make_first_level_design_matrix(
     oversampling : int, optional
         Oversampling factor used in temporal convolutions. Default=50.
 
+    orthogonalize_modulated_conditions : :obj:`bool`, optional
+        Whether to separate modulated effects of affected conditions from the
+        main effects.
+        To do this, conditions with parametric modulation are separated into
+        two regressors: a main effect regressor without any modulation,
+        and a modulation regressor where the ``modulation`` values are
+        retained, but are mean centered so that the HRF-convolved version of
+        the regressor is orthogonal to the main effect regressor.
+
+        This parameter only has an effect if ``events`` has a ``modulation``
+        column with values that vary within at least one ``trial_type``.
+
     Returns
     -------
     design_matrix : DataFrame instance,
@@ -354,6 +376,36 @@ def make_first_level_design_matrix(
 
     # step 1: events-related regressors
     if events is not None:
+        if orthogonalize_modulated_conditions and \
+                "modulation" in events.columns:
+            import pandas as pd
+            import numpy as np
+
+            # Only orthogonalize conditions with variable modulation weights
+            temp = events.groupby(["trial_type"]).std()["modulation"]
+            ttypes_mod = temp.loc[temp > 0].index.tolist()
+
+            events_mod = events.loc[events["trial_type"].isin(ttypes_mod)]
+            for ttype in ttypes_mod:
+                ttype_idx = events_mod["trial_type"] == ttype
+                # Mean center the modulation parameter within each condition to
+                # orthogonalize the modulated regressors w.r.t. the main effect
+                # regressors.
+                events_mod.loc[ttype_idx, "modulation"] -= np.mean(
+                    events_mod.loc[ttype_idx, "modulation"]
+                )
+
+            events_mod.loc[:, "trial_type"] = (
+                events_mod["trial_type"] + "xMOD"
+            )
+
+            # Do not modulate the main effect regressors
+            events.loc[:, "modulation"] = 1
+
+            # Add the modulated regressors back into the DataFrame
+            events = pd.concat((events, events_mod))
+            events = events.sort_values(by=["onset", "trial_type"])
+
         # create the condition-related regressors
         if isinstance(hrf_model, str):
             hrf_model = hrf_model.lower()
