@@ -281,8 +281,7 @@ def make_first_level_design_matrix(
                 conditions identifier. If missing each event are labelled
                 'dummy' and considered to form a unique condition.
             -   'duration': column to specify the duration of each events in
-                seconds. If missing the duration of each events is set
-                to zero.
+                seconds.
             -   'modulation': column to specify the amplitude of each
                 events. If missing the default is set to
                 ones(n_events).
@@ -409,6 +408,7 @@ def make_first_level_design_matrix(
         # create the condition-related regressors
         if isinstance(hrf_model, str):
             hrf_model = hrf_model.lower()
+
         matrix, names = _convolve_regressors(
             events, hrf_model, frame_times, fir_delays, min_onset,
             oversampling)
