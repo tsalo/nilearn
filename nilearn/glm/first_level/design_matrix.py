@@ -335,8 +335,13 @@ def make_first_level_design_matrix(
         retained, but are mean centered so that the HRF-convolved version of
         the regressor is orthogonal to the main effect regressor.
 
+        The new modulation regressors will be named based on the trial type
+        from which they spawned, with "xMOD" appended.
+
         This parameter only has an effect if ``events`` has a ``modulation``
         column with values that vary within at least one ``trial_type``.
+
+        Default=False.
 
     Returns
     -------

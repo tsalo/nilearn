@@ -322,6 +322,23 @@ class FirstLevelModel(BaseGLM):
         This id will be used to identify a `FirstLevelModel` when passed to
         a `SecondLevelModel` object.
 
+    orthogonalize_modulated_conditions : :obj:`bool`, optional
+        Whether to separate modulated effects of affected conditions from the
+        main effects.
+        To do this, conditions with parametric modulation are separated into
+        two regressors: a main effect regressor without any modulation,
+        and a modulation regressor where the ``modulation`` values are
+        retained, but are mean centered so that the HRF-convolved version of
+        the regressor is orthogonal to the main effect regressor.
+
+        The new modulation regressors will be named based on the trial type
+        from which they spawned, with "xMOD" appended.
+
+        This parameter only has an effect if ``events`` has a ``modulation``
+        column with values that vary within at least one ``trial_type``.
+
+        Default=False.
+
     Attributes
     ----------
     labels_ : array of shape (n_voxels,),
@@ -339,13 +356,31 @@ class FirstLevelModel(BaseGLM):
     It may change in any future release of Nilearn.
 
     """
-    def __init__(self, t_r=None, slice_time_ref=0., hrf_model='glover',
-                 drift_model='cosine', high_pass=.01, drift_order=1,
-                 fir_delays=[0], min_onset=-24, mask_img=None,
-                 target_affine=None, target_shape=None, smoothing_fwhm=None,
-                 memory=Memory(None), memory_level=1, standardize=False,
-                 signal_scaling=0, noise_model='ar1', verbose=0, n_jobs=1,
-                 minimize_memory=True, subject_label=None):
+    def __init__(
+        self,
+        t_r=None,
+        slice_time_ref=0.,
+        hrf_model='glover',
+        drift_model='cosine',
+        high_pass=.01,
+        drift_order=1,
+        fir_delays=[0],
+        min_onset=-24,
+        mask_img=None,
+        target_affine=None,
+        target_shape=None,
+        smoothing_fwhm=None,
+        memory=Memory(None),
+        memory_level=1,
+        standardize=False,
+        signal_scaling=0,
+        noise_model='ar1',
+        verbose=0,
+        n_jobs=1,
+        minimize_memory=True,
+        subject_label=None,
+        orthogonalize_modulated_conditions=False,
+    ):
         # design matrix parameters
         self.t_r = t_r
         self.slice_time_ref = slice_time_ref
@@ -355,6 +390,9 @@ class FirstLevelModel(BaseGLM):
         self.drift_order = drift_order
         self.fir_delays = fir_delays
         self.min_onset = min_onset
+        self.orthogonalize_modulated_conditions = (
+            orthogonalize_modulated_conditions
+        )
         # glm parameters
         self.mask_img = mask_img
         self.target_affine = target_affine
@@ -545,17 +583,21 @@ class FirstLevelModel(BaseGLM):
                 start_time = self.slice_time_ref * self.t_r
                 end_time = (n_scans - 1 + self.slice_time_ref) * self.t_r
                 frame_times = np.linspace(start_time, end_time, n_scans)
-                design = make_first_level_design_matrix(frame_times,
-                                                        events[run_idx],
-                                                        self.hrf_model,
-                                                        self.drift_model,
-                                                        self.high_pass,
-                                                        self.drift_order,
-                                                        self.fir_delays,
-                                                        confounds_matrix,
-                                                        confounds_names,
-                                                        self.min_onset
-                                                        )
+                design = make_first_level_design_matrix(
+                    frame_times=frame_times,
+                    events=events[run_idx],
+                    hrf_model=self.hrf_model,
+                    drift_model=self.drift_model,
+                    high_pass=self.high_pass,
+                    drift_order=self.drift_order,
+                    fir_delays=self.fir_delays,
+                    add_regs=confounds_matrix,
+                    add_reg_names=confounds_names,
+                    min_onset=self.min_onset,
+                    orthogonalize_modulated_conditions=(
+                        self.orthogonalize_modulated_conditions
+                    ),
+                )
             else:
                 design = design_matrices[run_idx]
             self.design_matrices_.append(design)
